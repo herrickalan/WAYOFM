@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+declare global { interface Window { __wayoTestAudios: HTMLAudioElement[] } }
+
 const episode = (slug: string, name: string) => ({
   key: `/wayoradio/${slug}/`, name, url: `https://www.mixcloud.com/wayoradio/${slug}/`,
   pictures: {}, created_time: '2026-10-10T12:00:00Z', audio_length: 3600,
@@ -87,9 +89,101 @@ test('audio loads and plays, persists across tabs, and pauses before archive pla
 });
 
 test('unavailable audio stream shows a useful fallback', async ({ page }) => {
-  await page.route('https://streaming.wayofm.org/wayo-192', route => route.fulfill({ status: 503, body: 'Unavailable' }));
+  let requests = 0;
+  await page.route('https://streaming.wayofm.org/wayo-192', route => {
+    requests++;
+    return route.fulfill({ status: 503, body: 'Unavailable' });
+  });
   await page.goto('/');
   await page.getByRole('button', { name: 'Play live radio', exact: true }).click();
   await expect(page.getByText('The live broadcast could not be played.', { exact: false })).toBeVisible({ timeout: 25000 });
   await expect(page.getByRole('button', { name: 'Open website' })).toBeVisible();
+  expect(requests).toBe(3);
+});
+
+test('a frozen audio clock reconnects even when the player still reports playing', async ({ page }) => {
+  let requests = 0;
+  await page.addInitScript(() => {
+    const audios: HTMLAudioElement[] = [];
+    window.__wayoTestAudios = audios;
+    window.Audio = new Proxy(window.Audio, {
+      construct(Target, args) {
+        const audio = new Target(args[0]);
+        audios.push(audio);
+        return audio;
+      },
+    });
+  });
+  await page.route('https://streaming.wayofm.org/wayo-192', route => {
+    requests++;
+    return route.fulfill({ contentType: 'audio/wav', body: silenceWav() });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play live radio', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause live radio' })).toBeVisible();
+  await page.evaluate(() => {
+    const audio = [...window.__wayoTestAudios].reverse().find(item => !item.paused);
+    if (!audio) throw new Error('The fixture audio never started');
+    const frozenTime = audio.currentTime;
+    Object.defineProperty(audio, 'currentTime', { configurable: true, get: () => frozenTime });
+  });
+  await expect(page.getByRole('button', { name: 'Cancel connection', exact: true })).toBeVisible();
+  await expect.poll(() => requests, { timeout: 18000 }).toBeGreaterThanOrEqual(2);
+  await expect(page.getByRole('button', { name: 'Pause live radio' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause live radio' }).click();
+  await expect(page.getByRole('button', { name: 'Play live radio', exact: true })).toBeVisible();
+});
+
+test('cancelling an unresponsive stream clears the connection instead of staying busy', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  let requested = false;
+  await page.route('https://streaming.wayofm.org/wayo-192', async route => {
+    requested = true;
+    await pending;
+    // Removing the source can abort this request before the fixture responds.
+    try { await route.fulfill({ contentType: 'audio/wav', body: silenceWav() }); } catch {}
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play live radio', exact: true }).click();
+  await expect.poll(() => requested).toBe(true);
+  await page.getByRole('button', { name: 'Cancel connection', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Play live radio', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Listen to broadcast' })).toBeVisible();
+  release();
+});
+
+test('YouTube and Mixcloud Live open inside the app and video pauses live radio', async ({ page, context }, testInfo) => {
+  await page.route('https://streaming.wayofm.org/wayo-192', route => route.fulfill({ contentType: 'audio/wav', body: silenceWav() }));
+  await page.route('https://www.youtube.com/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body>YouTube player fixture</body></html>' }));
+  await page.route('https://www.mixcloud.com/live/wayoradio/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body>Mixcloud Live player fixture</body></html>' }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play live radio', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause live radio' })).toBeVisible();
+  await page.getByRole('button', { name: 'Watch WAYO on YouTube' }).click();
+  await expect(page.locator('iframe')).toHaveAttribute('src', 'https://www.youtube.com/embed/JWuorF9K-b8?playsinline=1&rel=0');
+  await expect(page.locator('iframe')).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  await expect(page.locator('iframe')).toHaveAttribute('allow', /fullscreen/);
+  await page.getByRole('button', { name: 'Play Rayanna and the Feral Dogs · Live at WAYO' }).click();
+  await expect(page.locator('iframe')).toHaveAttribute('src', /embed\/6T_sRQx2x94/);
+  await page.screenshot({ path: testInfo.outputPath('youtube-app.png') });
+  await page.getByRole('button', { name: 'Close page' }).click();
+  await expect(page.getByRole('button', { name: 'Play live radio', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Watch live', exact: true }).click();
+  await expect(page.locator('iframe')).toHaveAttribute('src', 'https://www.mixcloud.com/live/wayoradio/');
+  await page.getByRole('button', { name: 'Close page' }).click();
+  await page.getByRole('tab', { name: 'Community' }).click();
+  await page.getByRole('button', { name: 'YouTube', exact: true }).click();
+  await expect(page.locator('iframe')).toHaveAttribute('src', /embed\/JWuorF9K-b8/);
+  expect(context.pages()).toHaveLength(1);
+});
+
+test('the supplied rocket is visible on the app loading screen', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/*.ttf', async route => { await pending; await route.continue(); });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  try { await expect(page.getByRole('img', { name: 'WAYO rocket loading image' })).toBeVisible(); }
+  finally { release(); }
+  await expect(page.getByText('A little different.', { exact: false })).toBeVisible();
 });

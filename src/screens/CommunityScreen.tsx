@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LINKS, STATION, type StationPage } from '../config';
+import { LINKS, STATION, YOUTUBE_PAGE, type StationPage } from '../config';
 import { colors as c } from '../theme';
 import { Button, Eyebrow, Icon, LinkRow, SectionHeading } from '../components/ui';
 
@@ -34,7 +34,7 @@ export default function CommunityScreen({ external, openPage }: { external: (url
       <View style={s.mailing}><Text style={s.addressName}>Studio & mailing information</Text><Text style={s.addressText}>The WAYO studio is at Fedder Industrial Park, between Culver and Goodman.</Text><Text style={s.addressText}>Records, cassettes, and CDs can be mailed to the studio address above. You can include a show or programmer’s name, plus information about yourself or your band. Email music files and links to music@wayofm.org.</Text></View>
     </View></View>
     <View><SectionHeading title="Stay connected" /><View style={s.socials}>
-      {[{ name: 'YouTube', icon: 'youtube' as const, url: LINKS.youtube }, { name: 'Facebook', icon: 'facebook' as const, url: LINKS.facebook }, { name: 'Instagram', icon: 'instagram' as const, url: LINKS.instagram }].map(social => <Pressable accessibilityRole="button" accessibilityLabel={social.name} key={social.name} style={s.social} onPress={() => external(social.url)}><Icon name={social.icon} size={23} /><Text style={s.socialLabel}>{social.name}</Text></Pressable>)}
+      {[{ name: 'YouTube', icon: 'youtube' as const, url: LINKS.youtube }, { name: 'Facebook', icon: 'facebook' as const, url: LINKS.facebook }, { name: 'Instagram', icon: 'instagram' as const, url: LINKS.instagram }].map(social => <Pressable accessibilityRole="button" accessibilityLabel={social.name} key={social.name} style={s.social} onPress={() => social.name === 'YouTube' ? openPage(YOUTUBE_PAGE) : external(social.url)}><Icon name={social.icon} size={23} /><Text style={s.socialLabel}>{social.name}</Text></Pressable>)}
     </View></View>
     <Text style={s.signoff}>INDEPENDENT RADIO. ROCHESTER, NEW YORK.{ '\n' }WAYO 104.3FM</Text>
   </View>;

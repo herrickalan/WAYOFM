@@ -1,17 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import Feather from '@expo/vector-icons/Feather';
-import { branding } from './branding';
 import { LINKS, type StationPage } from './config';
 import { colors as c } from './theme';
 import { openExternal } from './services/links';
 import { useLiveRadio } from './hooks/useLiveRadio';
 import { Icon, Wordmark, type IconName } from './components/ui';
 import PageViewer from './components/PageViewer';
+import LoadingScreen from './components/LoadingScreen';
 import ListenScreen from './screens/ListenScreen';
 import ExploreScreen from './screens/ExploreScreen';
 import ArchivesScreen from './screens/ArchivesScreen';
@@ -48,7 +48,7 @@ function StationApp() {
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
 
-  if (!fontsLoaded && !fontError) return <View style={s.splash}>{branding.splash ? <Image source={branding.splash} style={s.splashImage} resizeMode="contain" /> : <Wordmark large />}<ActivityIndicator color={c.blue} /><Text style={s.splashLabel}>A little different. A lot of WAYO.</Text></View>;
+  if (!fontsLoaded && !fontError) return <LoadingScreen label="A little different. A lot of WAYO." />;
 
   return <View style={s.outer}>
     <StatusBar style="dark" />
@@ -109,7 +109,4 @@ const s = StyleSheet.create({
   dismiss: { padding: 10 },
   errorBar: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: c.paleOrange },
   errorBarText: { color: c.ink, fontSize: 11, lineHeight: 17 },
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 35, backgroundColor: c.white },
-  splashImage: { width: 260, height: 190 },
-  splashLabel: { color: c.muted, fontSize: 13 },
 });

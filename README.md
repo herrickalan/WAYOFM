@@ -10,11 +10,12 @@ The repository tree keeps generated `ios/` and `android/` directories out of ver
 
 ## Included
 
-- **Listen:** native live audio, persistent player, pause/resume at the live edge, connection cancellation, retry and website fallback. Background audio and lock-screen controls are configured for native development/production builds.
+- **Listen:** native live audio, persistent player, pause/resume at the live edge, startup and playback-stall detection, up to two automatic reconnects, connection cancellation, manual retry and website fallback. Background audio and lock-screen controls are configured for native development/production builds.
+- **Watch:** Mixcloud Live stays inside the app. YouTube opens an embedded player with three station-featured Live at WAYO performances and a video picker, available from Listen and Community. Opening a media player pauses live radio; closing it stops the embedded player.
 - **Explore:** Live at WAYO, Show Guide, daily Schedule, About, News, and Supporters. These station-maintained pages open inside the native app using WebView, keeping content current.
 - **Archives:** live Mixcloud API data, episode artwork, dates and durations, search across loaded episodes, pagination, and Mixcloud’s embedded episode player. Live radio pauses before watching video or playing an archive. No sample episodes are shipped in the app.
 - **Community:** browser-based donation, volunteering, DJ application, and subscription; call, SMS, email, social accounts, map directions, and full studio/mailing/inquiry information.
-- **Branding:** the original `weblogo_trans.png` logo and `wowee-progress.png` rocket loading image, bundled locally. The rocket is also configured as the native launch image.
+- **Branding:** the original `weblogo_trans.png` logo and supplied `wowee-progress.png` rocket, bundled locally. The rocket appears during app startup, archive loading, and native page/player loading, and is configured as the native launch image.
 
 ## Run
 
@@ -46,6 +47,8 @@ npx expo start --go --tunnel
 Expo may ask to install its ngrok tunnel helper; follow the CLI prompt. Tunnel startup needs Internet access and must print a reachable URL before scanning. Expo’s offline CLI mode cannot be used with `--tunnel`; unset `EXPO_OFFLINE` if you previously set it. Cloud network policy can also block tunnel destinations, so use a local computer when cloud tunneling is unavailable.
 
 Use an SDK 57 compatible Expo Go installation for a quick foreground smoke test. If Expo Go reports an SDK mismatch, update it. Use an installed native development build for background audio, Android media notifications, and lock-screen controls: `npm run start:dev`. Expo Go’s native settings do not substitute for testing the app’s own native binary.
+
+To use updates, run `git pull` in a Git clone, or download the latest source ZIP into a fresh folder. Then run `npm ci` and `npx expo start --go --clear`, reopen Expo Go, and scan the new QR code. The rocket loading view runs inside the app; Expo Go controls its own initial launch screen. Test the configured native rocket launch screen with a WAYO development or production build.
 
 For this cloud machine, caches and Expo’s optional online CLI checks need these settings:
 
@@ -90,7 +93,13 @@ Native configuration enables the iOS `audio` background mode and the Android med
 
 The live endpoint is `https://streaming.wayofm.org/wayo-192`, published by WAYO’s player script at `https://wayofm.org/sites/all/libraries/jplayer/skin/flat-audio/js/flat.audio.js`. It is configured in `src/config.ts` rather than scraping a web page on every play. For a future endpoint change, either update that constant or set `EXPO_PUBLIC_LIVE_STREAM_URL` in a local `.env` and restart Metro/rebuild. This variable is public configuration, not a secret. Do not put credentials in it.
 
+Each live connection has a 15-second startup limit, including audio-session preparation and URL resolution. Playback must advance before the UI declares it connected. After playback starts, a 12-second stall triggers a fresh connection at the live edge. The player makes two automatic retries with one- and two-second delays, then provides a manual retry and website fallback. Thirty seconds of healthy playback restores the retry budget for a later interruption. Cancelling releases the media source and invalidates pending work so late responses cannot restart playback. Suspended background timers do not count as a stall on return to the foreground; native system pauses are respected.
+
 The archive reads `https://api.mixcloud.com/wayoradio/cloudcasts/?limit=20` and follows validated pagination URLs. The complete station archive remains accessible at `https://wayofm.org/episodes`. Live audio and archived Mixcloud playback use separate services; archived audio is played by Mixcloud’s official widget rather than downloading protected media.
+
+YouTube uses its official iframe player for The Thriffs, Rayanna and the Feral Dogs, and East Esker, verified against `https://wayofm.org/shows/live-wayo` on October 11, 2026. This is a curated selection rather than an automatic list of all channel uploads. Add or replace entries in `YOUTUBE_VIDEOS` in `src/config.ts`. The YouTube toolbar’s optional browser button still opens the requested WAYO channel. Playback starts when the user taps the provider’s play control; fullscreen and inline playback are enabled. Provider login or embedding restrictions can still apply.
+
+Native embedded players load inside an HTML wrapper with `https://wayofm.org/` as its base URL and a referrer policy, supplying the client identification YouTube requires. A bare YouTube embed URL without a Referer can fail with player error 153. Mixcloud Live uses its live page inside the native WebView; archive episodes use the dedicated Mixcloud widget.
 
 All user-provided destinations are centralized in `src/config.ts`. The numeric equivalent of `(585) 203-WAYO` is `(585) 203-9296`. Contact text was verified against the station’s contact page on October 11, 2026. The station-maintained contact page remains accessible inside the app if those details change.
 
@@ -104,14 +113,14 @@ The two images match the supplied artwork and were copied without modification. 
 ## Validation
 
 ```sh
-npm run check                 # TypeScript and 5 service tests
+npm run check                 # TypeScript and 17 service/player tests
 npm run export                # iOS, Android, and web production bundles
-npm run test:e2e              # web export and 5 mobile-viewport browser tests
+npm run test:e2e              # web export and 9 mobile-viewport browser tests
 ```
 
 In the cloud, set the cache/Expo variables above before export/e2e commands. Browser tests require Python 3 and Chromium. This machine provides `/usr/bin/chromium`; set `CHROMIUM_PATH` for a different installation. Playwright automatically serves the export during testing. Fixture data/audio are test-only and do not ship in the application.
 
-The current implementation passed the type check, all five service tests, and all five browser tests. The iOS/Android/web bundles exported successfully, and both native projects generated successfully. Mobile layouts at 390px and 320px were checked, with no horizontal overflow or JavaScript errors on the Listen screen. The public archive API returned current WAYO episodes. The cloud proxy denied the streaming host, so actual live-broadcast playback was not verified here; apply the saved domain additions in environment settings and retry. Audio playback was exercised with a decodable WAV fixture. Native device behavior and signed binaries remain untested.
+The current implementation passed the type check, all 17 service/player tests, and all nine browser tests. The iOS/Android/web bundles exported successfully, and both native projects generated successfully. Player regressions cover hung preparation/resolution, frozen playback clocks, buffering, retry limits, cancellation, system pause/resume, and background timer suspension. Browser tests exercise navigation, archives, actual fixture audio playback, post-start stall recovery, embedded video selection, and the rocket loading view. The public archive API returned current WAYO episodes. On October 11, 2026, a 20-second station-stream probe returned HTTP 200 and continuous, decodable 192 kbps stereo MP3. This verifies the endpoint at that time, not playback on a phone. The cloud proxy blocks YouTube, so YouTube integration was tested with iframe fixtures rather than actual YouTube playback. Native iPhone/Android behavior, provider playback on devices, and signed binaries remain untested.
 
 ## Cloud environment
 

@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LINKS, type StationPage } from '../config';
 import { type Episode, ARCHIVE_URL, episodeDate, episodeDuration, getEpisodes, mergeEpisodes, mixcloudEmbed } from '../services/mixcloud';
 import { colors as c } from '../theme';
 import { Button, ErrorNotice, Eyebrow, Icon } from '../components/ui';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function ArchivesScreen({ openPage }: { openPage: (page: StationPage) => void }) {
   const [episodes, setEpisodes] = useState<Episode[]>([]);
@@ -39,10 +40,10 @@ export default function ArchivesScreen({ openPage }: { openPage: (page: StationP
     <Text style={s.description}>Replay your favorites and discover something new. Past broadcasts, straight from WAYO on Mixcloud.</Text>
     <View style={s.search}><Icon name="search" color={c.muted} size={19} /><TextInput accessibilityLabel="Search loaded episodes" placeholder="Search loaded episodes" placeholderTextColor={c.muted} value={search} onChangeText={setSearch} style={s.input} autoCapitalize="none" returnKeyType="search" />{search.length > 0 && <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearch('')} style={s.clear}><Icon name="x" size={17} /></Pressable>}</View>
     <View style={s.meta}><Text style={s.count}>{search ? `${filtered.length} matching episodes` : `${episodes.length} episodes loaded`}</Text><Pressable accessibilityRole="button" onPress={() => openPage({ title: 'All WAYO episodes', url: LINKS.episodes })}><Text style={s.all}>All episodes ↗</Text></Pressable></View>
-    {busy && episodes.length === 0 && <View style={s.loading}><ActivityIndicator size="large" color={c.blue} /><Text style={s.description}>Loading the archive…</Text></View>}
-    {filtered.map(episode => <Pressable accessibilityRole="button" accessibilityLabel={`Play ${episode.name}`} key={episode.key} style={s.episode} onPress={() => openPage({ title: episode.name, url: mixcloudEmbed(episode.key), embed: true })}>
+    {busy && episodes.length === 0 && <LoadingScreen compact label="Loading the archive…" />}
+    {filtered.map(episode => <Pressable accessibilityRole="button" accessibilityLabel={`Play ${episode.name}`} key={episode.key} style={s.episode} onPress={() => openPage({ title: episode.name, url: mixcloudEmbed(episode.key), browserUrl: episode.url, embed: true })}>
       <View style={s.cover}>{episode.image && !failedImages.has(episode.key) ? <Image source={{ uri: episode.image }} style={s.image} onError={() => setFailedImages(previous => new Set([...previous, episode.key]))} /> : <Icon name="disc" size={32} color={c.blue} />}</View>
-      <View style={{ flex: 1, gap: 6 }}><Text numberOfLines={2} style={s.episodeName}>{episode.name}</Text><Text style={s.episodeMeta}>{episodeDate(episode.created)} · {episodeDuration(episode.duration)}</Text><Text style={s.mixcloud}>LISTEN ON MIXCLOUD</Text></View><View style={s.play}><Icon name="play" size={16} color={c.ink} /></View>
+      <View style={{ flex: 1, gap: 6 }}><Text numberOfLines={2} style={s.episodeName}>{episode.name}</Text><Text style={s.episodeMeta}>{episodeDate(episode.created)} · {episodeDuration(episode.duration)}</Text><Text style={s.mixcloud}>PLAY IN APP · MIXCLOUD</Text></View><View style={s.play}><Icon name="play" size={16} color={c.ink} /></View>
     </Pressable>)}
     {!busy && !error && filtered.length === 0 && <View style={s.empty}><Icon name="disc" size={37} color={c.muted} /><Text style={s.emptyTitle}>{search ? 'No matching episodes loaded' : 'No episodes available yet'}</Text><Text style={s.emptyCopy}>{search ? 'Try another title, load more episodes, or explore the complete archive.' : 'Check back soon or browse the archive on the WAYO website.'}</Text></View>}
     {error && <ErrorNotice message={error} onRetry={() => void load(episodes.length && next ? next : ARCHIVE_URL, Boolean(episodes.length && next))} onWebsite={() => openPage({ title: 'WAYO episodes', url: LINKS.episodes })} />}
@@ -63,7 +64,6 @@ const s = StyleSheet.create({
   meta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: 34 },
   count: { fontSize: 11, color: c.muted, fontWeight: '600' },
   all: { fontSize: 12, color: c.blue, fontWeight: '800', paddingVertical: 10 },
-  loading: { paddingVertical: 45, gap: 16, alignItems: 'center' },
   episode: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, backgroundColor: c.white, borderRadius: 16, borderWidth: 1, borderColor: c.line },
   cover: { width: 74, height: 82, borderRadius: 9, backgroundColor: c.paleBlue, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   image: { width: '100%', height: '100%' },

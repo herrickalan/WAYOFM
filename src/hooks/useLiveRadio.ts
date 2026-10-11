@@ -1,86 +1,65 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { AppState, Platform } from 'react-native';
+import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { resolveLiveStream } from '../services/station';
+import { INITIAL_RADIO_STATE, LiveRadioController } from '../services/liveRadio';
 
 export function useLiveRadio() {
   const player = useAudioPlayer(null, { updateInterval: 500 });
-  const status = useAudioPlayerStatus(player);
-  const [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const request = useRef(0);
-  const stream = useRef<string | null>(null);
-  const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearTimeoutRef = useCallback(() => {
-    if (timeout.current) clearTimeout(timeout.current);
-    timeout.current = null;
-  }, []);
-
-  const pause = useCallback(() => {
-    request.current++;
-    clearTimeoutRef();
-    setConnecting(false);
-    player.pause();
-  }, [player, clearTimeoutRef]);
-
-  const toggle = useCallback(async () => {
-    if (player.playing || connecting) { pause(); return; }
-    const token = ++request.current;
-    setConnecting(true);
-    setError(null);
-    try {
-      await setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' });
-      const url = stream.current || await resolveLiveStream();
-      if (token !== request.current) return;
-      stream.current = url;
-      // Replace on resume so a paused live stream returns to the live edge.
-      player.replace({ uri: url });
-      if (Platform.OS !== 'web') {
-        player.setActiveForLockScreen(true, { title: 'WAYO 104.3FM', artist: 'Live from Rochester, NY' }, {
-          showSeekBackward: false, showSeekForward: false,
-        });
-      }
-      player.play();
-      timeout.current = setTimeout(() => {
-        if (token !== request.current) return;
-        player.pause();
-        setConnecting(false);
-        stream.current = null;
-        setError('The stream is taking too long to connect. Try again or listen on the website.');
-      }, 20000);
-    } catch (cause) {
-      if (token !== request.current) return;
-      clearTimeoutRef();
-      setConnecting(false);
-      stream.current = null;
-      setError(cause instanceof Error ? cause.message : 'Unable to start the live broadcast. Please try again.');
-    }
-  }, [player, connecting, pause, clearTimeoutRef]);
+  const [state, setState] = useState(INITIAL_RADIO_STATE);
+  const controller = useRef<LiveRadioController | null>(null);
 
   useEffect(() => {
-    if (status.error) {
-      pause();
-      stream.current = null;
-      setError('The live broadcast could not be played. Please try again or listen on the website.');
-    }
-  }, [status.error, pause]);
+    const radio = new LiveRadioController({
+      prepare: () => setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' }),
+      resolveUrl: resolveLiveStream,
+      start: url => {
+        // Every connection starts at the live edge, including automatic retries.
+        player.replace({ uri: url });
+        if (Platform.OS !== 'web') {
+          player.setActiveForLockScreen(true, { title: 'WAYO 104.3FM', artist: 'Live from Rochester, NY' }, {
+            showSeekBackward: false, showSeekForward: false,
+          });
+        }
+        player.play();
+      },
+      stop: () => {
+        try { player.pause(); } finally { player.replace(null); }
+        if (Platform.OS !== 'web') player.clearLockScreenControls();
+      },
+      readStatus: () => player.currentStatus,
+    }, setState);
+    controller.current = radio;
+    radio.setForeground(AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
+    const statusListener = player.addListener('playbackStatusUpdate', status => radio.update(status));
+    const appListener = AppState.addEventListener('change', next => radio.setForeground(next === 'active'));
+    // Poll too: a frozen player may stop publishing status updates entirely.
+    const timer = setInterval(() => radio.tick(), 500);
+    return () => {
+      radio.dispose();
+      clearInterval(timer);
+      statusListener.remove();
+      appListener.remove();
+      controller.current = null;
+    };
+  }, [player]);
 
-  useEffect(() => {
-    if (status.isLoaded && status.playing && !status.isBuffering) {
-      clearTimeoutRef();
-      setConnecting(false);
-    }
-  }, [status.isLoaded, status.playing, status.isBuffering, clearTimeoutRef]);
-
-  useEffect(() => () => { request.current++; clearTimeoutRef(); }, [clearTimeoutRef]);
+  const pause = useCallback(() => controller.current?.pause(), []);
+  const toggle = useCallback(async () => controller.current?.toggle(), []);
+  const busy = ['connecting', 'buffering', 'retrying'].includes(state.phase);
+  const label = state.phase === 'retrying' ? `Reconnecting to WAYO… (${state.retries}/2)`
+    : state.phase === 'buffering' ? 'Broadcast interrupted. Reconnecting…'
+    : state.phase === 'connecting' ? 'Connecting to WAYO…'
+    : state.phase === 'playing' ? 'You’re listening live'
+    : state.phase === 'failed' ? 'Broadcast unavailable' : 'Live from Rochester, NY';
 
   return {
-    playing: status.playing,
-    busy: connecting || status.isBuffering,
-    error,
+    playing: state.phase === 'playing',
+    busy,
+    error: state.error,
     toggle,
     pause,
-    label: connecting || status.isBuffering ? 'Connecting to WAYO…' : status.playing ? 'You’re listening live' : 'Live from Rochester, NY',
+    label,
   };
 }
 

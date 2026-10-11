@@ -37,4 +37,28 @@ export const LINKS = {
   map: 'https://www.google.com/maps/search/?api=1&query=WAYO+104.3FM+1237+E+Main+St+Rochester+NY+14609',
 };
 
-export type StationPage = { title: string; url: string; embed?: boolean };
+export type EmbeddedVideo = { title: string; url: string; browserUrl: string };
+export type StationPage = {
+  title: string;
+  url: string;
+  embed?: boolean;
+  browserUrl?: string;
+  videos?: readonly EmbeddedVideo[];
+};
+
+// Featured by https://wayofm.org/shows/live-wayo; verified October 11, 2026.
+// Add performances here as the station publishes them. No YouTube API key is needed.
+export const YOUTUBE_VIDEOS: readonly EmbeddedVideo[] = [
+  { title: 'The Thriffs · Live at WAYO', id: 'JWuorF9K-b8' },
+  { title: 'Rayanna and the Feral Dogs · Live at WAYO', id: '6T_sRQx2x94' },
+  { title: 'East Esker · Live at WAYO', id: 'sbnGTNNe0FQ' },
+].map(video => ({
+  title: video.title,
+  url: `https://www.youtube.com/embed/${video.id}?playsinline=1&rel=0`,
+  browserUrl: `https://www.youtube.com/watch?v=${video.id}`,
+}));
+
+export const YOUTUBE_PAGE: StationPage = {
+  title: 'WAYO on YouTube', url: YOUTUBE_VIDEOS[0]!.url,
+  embed: true, browserUrl: LINKS.youtube, videos: YOUTUBE_VIDEOS,
+};

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LINKS, type StationPage } from '../config';
+import { LINKS, YOUTUBE_PAGE, type StationPage } from '../config';
 import { type LiveRadio } from '../hooks/useLiveRadio';
 import { colors as c } from '../theme';
 import { Button, ErrorNotice, Eyebrow, Icon, SectionHeading } from '../components/ui';
@@ -35,6 +35,7 @@ export default function ListenScreen({ radio, openPage, goArchives, external }: 
       <Button title="Live at WAYO" icon="headphones" kind="light" style={{ flex: 1 }} onPress={() => openPage({ title: 'Live at WAYO', url: LINKS.live })} />
       <Button title="Watch live" icon="video" kind="blue" style={{ flex: 1 }} onPress={() => openPage({ title: 'Watch WAYO live', url: LINKS.watch })} />
     </View>
+    <Button title="Watch WAYO on YouTube" icon="youtube" kind="light" onPress={() => openPage(YOUTUBE_PAGE)} />
 
     <View>
       <SectionHeading title="Find your frequency" />
