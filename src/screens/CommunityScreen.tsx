@@ -16,9 +16,9 @@ export default function CommunityScreen({ external, openPage }: { external: (url
       <Button title="Donate to WAYO" icon="arrow-up-right" onPress={() => external(LINKS.donate)} />
     </View>
     <View><SectionHeading title="Get involved" /><View style={s.list}>
-      <LinkRow title="Volunteer" description="Share your time and talents" icon="users" external onPress={() => external(LINKS.volunteer)} />
+      <LinkRow title="Volunteer" description="Share your time and talents" icon="users" onPress={() => openPage({ title: 'Volunteer', url: LINKS.volunteer })} />
       <LinkRow title="Be a DJ" description="Bring your voice to the airwaves" icon="mic" external onPress={() => external(LINKS.dj)} />
-      <LinkRow title="Subscribe" description="Sign up for updates from WAYO" icon="mail" external onPress={() => external(LINKS.subscribe)} />
+      <LinkRow title="Subscribe" description="Sign up for updates from WAYO" icon="mail" onPress={() => openPage({ title: 'Subscribe', url: LINKS.subscribe })} />
       <LinkRow title="Our supporters" description="Meet the people who make it possible" icon="heart" onPress={() => openPage({ title: 'Supporters', url: LINKS.supporters })} />
     </View></View>
     <View><SectionHeading title="Say hello" /><View style={s.list}>

@@ -23,16 +23,72 @@ test('native navigation and station pages use the requested destinations', async
   await expect(page.getByText('A little different.')).toBeVisible();
   await page.getByRole('button', { name: 'Show Guide', exact: true }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', 'https://wayofm.org/shows/all');
-  await page.getByRole('button', { name: 'Close page' }).click();
+  await expect(page.getByRole('button', { name: 'WAYO home' })).toBeVisible();
+  for (const name of ['Listen', 'Explore', 'Archives', 'Community']) await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to Listen' }).click();
   await page.getByRole('tab', { name: 'Explore' }).click();
   await page.getByRole('button', { name: 'Schedule', exact: true }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', 'https://wayofm.org/schedule/day');
-  await page.getByRole('button', { name: 'Close page' }).click();
+  await page.getByRole('button', { name: 'Back to Explore' }).click();
   await page.getByRole('tab', { name: 'Community' }).click();
   await expect(page.getByText('1237 E Main St', { exact: false })).toBeAttached();
   await expect(page.getByRole('button', { name: 'Call WAYO', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Text WAYO', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Email us', exact: true })).toBeVisible();
+  for (const destination of [{ title: 'Contact information', path: '/contact' }, { title: 'Volunteer', path: '/volunteer' }, { title: 'Subscribe', path: '/signup' }]) {
+    await page.getByRole('button', { name: destination.title, exact: true }).click();
+    await expect(page.locator('iframe')).toHaveAttribute('src', `https://wayofm.org${destination.path}`);
+    await expect(page.getByRole('tab', { name: 'Community', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to Community' }).click();
+  }
+});
+
+test('browsing the station website keeps Home and tabs on screen and blocks browser escapes', async ({ page, context }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.route('https://wayofm.org/**', route => {
+    const path = new URL(route.request().url()).pathname;
+    return route.fulfill({ contentType: 'text/html', body: `<html><body>
+      <h1>${path === '/news' ? 'Station news fixture' : 'Show Guide fixture'}</h1>
+      <a href="/news">Station news</a>
+      <a href="/contact" target="_blank">Popup contact</a>
+      <a href="https://wayofm.org/" target="_top">Replace app</a>
+    </body></html>` });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Show Guide', exact: true }).click();
+  await page.frameLocator('iframe').getByRole('link', { name: 'Station news', exact: true }).click();
+  await expect(page.frameLocator('iframe').getByText('Station news fixture')).toBeVisible();
+  await page.frameLocator('iframe').getByRole('link', { name: 'Popup contact' }).click();
+  await page.frameLocator('iframe').getByRole('link', { name: 'Replace app' }).click();
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Back to Listen' })).toBeInViewport();
+  for (const name of ['Listen', 'Explore', 'Archives', 'Community']) await expect(page.getByRole('tab', { name, exact: true })).toBeInViewport();
+  expect(context.pages()).toHaveLength(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.screenshot({ path: testInfo.outputPath('website-navigation-320.png') });
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByText('A little different.')).toBeVisible();
+  await page.getByRole('tab', { name: 'Explore' }).click();
+  await page.getByRole('button', { name: 'Schedule', exact: true }).click();
+  await page.getByRole('tab', { name: 'Community' }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Contact information', exact: true })).toBeVisible();
+});
+
+test('website browsing retains live-radio controls and pausing does not close the website', async ({ page }) => {
+  await page.route('https://wayofm.org/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body>Station website fixture</body></html>' }));
+  await page.route('https://streaming.wayofm.org/wayo-192', route => route.fulfill({ contentType: 'audio/wav', body: silenceWav() }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Play live radio', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause live radio' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show Guide', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause broadcast' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause broadcast' }).click();
+  await expect(page.locator('iframe')).toHaveAttribute('src', 'https://wayofm.org/shows/all');
+  await page.getByRole('button', { name: 'Listen to broadcast' }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Pause live radio' })).toBeVisible();
 });
 
 test('archives search, pagination, state preservation, and Mixcloud player', async ({ page }) => {

@@ -9,6 +9,7 @@ import { LINKS, type StationPage } from './config';
 import { colors as c } from './theme';
 import { openExternal } from './services/links';
 import { mediaPageFromUrl } from './services/embeddedMedia';
+import { isStationWebsiteUrl } from './services/pageNavigation';
 import { useLiveRadio } from './hooks/useLiveRadio';
 import { Icon, Wordmark, type IconName } from './components/ui';
 import PageViewer from './components/PageViewer';
@@ -31,7 +32,6 @@ const tabs: { id: Tab; title: string; icon: IconName }[] = [
 function StationApp() {
   const [tab, setTab] = useState<Tab>('listen');
   const [page, setPage] = useState<StationPage | null>(null);
-  const [media, setMedia] = useState<StationPage | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [visitedArchives, setVisitedArchives] = useState(false);
   const scroll = useRef<ScrollView>(null);
@@ -40,31 +40,30 @@ function StationApp() {
 
   useEffect(() => { if (fontsLoaded || fontError) void SplashScreen.hideAsync(); }, [fontsLoaded, fontError]);
   useEffect(() => {
-    if (!media) return;
-    const listener = BackHandler.addEventListener('hardwareBackPress', () => { setMedia(null); return true; });
+    if (!page) return;
+    const listener = BackHandler.addEventListener('hardwareBackPress', () => { setPage(null); return true; });
     return () => listener.remove();
-  }, [media]);
-  const external = (url: string) => void openExternal(url).catch(() => setMessage('This link could not be opened. Make sure you have an app available for it.'));
+  }, [page]);
+  const external = (url: string) => {
+    if (isStationWebsiteUrl(url)) {
+      openPage({ title: url === LINKS.volunteer ? 'Volunteer' : url === LINKS.subscribe ? 'Subscribe' : 'WAYO website', url });
+      return;
+    }
+    void openExternal(url).catch(() => setMessage('This link could not be opened. Make sure you have an app available for it.'));
+  };
   const openPage = (next: StationPage) => {
     const playerPage = next.embed ? next : mediaPageFromUrl(next.url, next.title);
-    if (playerPage) {
-      radio.pause();
-      setPage(null);
-      setMedia(playerPage);
-    } else {
-      if ([LINKS.live, LINKS.listen].includes(next.url)) radio.pause();
-      setMedia(null);
-      setPage(next);
-    }
+    if (playerPage || [LINKS.live, LINKS.listen].includes(next.url)) radio.pause();
+    setPage(playerPage ?? next);
   };
   const changeTab = (next: Tab) => {
-    setMedia(null);
+    setPage(null);
     setTab(next);
     if (next === 'archives') setVisitedArchives(true);
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
   const toggleLive = () => {
-    if (media) changeTab('listen');
+    if (page && !radio.playing && !radio.busy) changeTab('listen');
     void radio.toggle();
   };
 
@@ -77,8 +76,8 @@ function StationApp() {
         <Pressable accessibilityRole="button" accessibilityLabel="WAYO home" onPress={() => changeTab('listen')}><Wordmark /><Text style={s.headerTag}>COMMUNITY POWERED RADIO</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Donate" onPress={() => external(LINKS.donate)} style={s.donate}><Icon name="heart" size={14} /><Text style={s.donateLabel}>Support</Text></Pressable>
       </View>
-      {media && <PageViewer key={media.url} page={media} inline backLabel={tabs.find(item => item.id === tab)!.title} onClose={() => setMedia(null)} onHome={() => changeTab('listen')} onMediaPage={openPage} onError={setMessage} />}
-      <ScrollView ref={scroll} style={[s.scroll, media && { display: 'none' }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      {page && <PageViewer key={page.url} page={page} backLabel={tabs.find(item => item.id === tab)!.title} onClose={() => setPage(null)} onHome={() => changeTab('listen')} onOpenPage={openPage} onError={setMessage} />}
+      <ScrollView ref={scroll} style={[s.scroll, page && { display: 'none' }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {tab === 'listen' && <ListenScreen radio={radio} openPage={openPage} goArchives={() => changeTab('archives')} external={external} />}
         {tab === 'explore' && <ExploreScreen openPage={openPage} />}
         {visitedArchives && <View style={{ display: tab === 'archives' ? 'flex' : 'none' }}><ArchivesScreen openPage={openPage} /></View>}
@@ -96,7 +95,6 @@ function StationApp() {
         <View style={[s.tabIcon, tab === item.id && { backgroundColor: c.paleBlue }]}><Icon name={item.icon} color={tab === item.id ? c.blue : c.muted} size={20} /></View><Text style={[s.tabLabel, tab === item.id && { color: c.blue }]}>{item.title}</Text>
       </Pressable>)}</View>
     </SafeAreaView>
-    <PageViewer page={page} onClose={() => setPage(null)} onMediaPage={openPage} onError={setMessage} />
   </View>;
 }
 

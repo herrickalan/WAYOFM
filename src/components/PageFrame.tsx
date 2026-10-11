@@ -3,9 +3,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors as c } from '../theme';
 import { Icon } from './ui';
 
-export default function MediaFrame({ title, backLabel, onBack, onHome, video, live, player, picker }: {
+export default function PageFrame({ title, backLabel, onBack, onHome, video, live, player, picker, website = false, tools }: {
   title: string; backLabel: string; onBack: () => void; onHome: () => void;
-  video: boolean; live: boolean; player: ReactNode; picker?: ReactNode;
+  video: boolean; live: boolean; player: ReactNode; picker?: ReactNode; website?: boolean; tools?: ReactNode;
 }) {
   return <View style={s.root}>
     <View style={s.actions}>
@@ -16,11 +16,15 @@ export default function MediaFrame({ title, backLabel, onBack, onHome, video, li
         <Icon name="home" size={17} color={c.blue} /><Text style={s.actionLabel}>Home</Text>
       </Pressable>
     </View>
-    <ScrollView style={s.scroll} nestedScrollEnabled contentContainerStyle={s.content}>
+    {website ? <>
+      <Text style={s.title} numberOfLines={1}>{title}</Text>
+      {tools}
+      <View style={s.website}>{player}</View>
+    </> : <ScrollView style={s.scroll} nestedScrollEnabled contentContainerStyle={s.content}>
       <Text style={s.title}>{title}</Text>
       <View style={[s.player, video ? s.video : live ? s.live : s.audio]}>{player}</View>
       {picker}
-    </ScrollView>
+    </ScrollView>}
   </View>;
 }
 
@@ -34,6 +38,7 @@ const s = StyleSheet.create({
   content: { paddingBottom: 12 },
   title: { color: c.ink, fontSize: 18, lineHeight: 25, fontWeight: '800', paddingHorizontal: 20, paddingVertical: 15 },
   player: { width: '100%', overflow: 'hidden', backgroundColor: c.ink },
+  website: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: c.white },
   video: { aspectRatio: 16 / 9, minHeight: 200 },
   audio: { height: 280 },
   live: { height: 420 },
