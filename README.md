@@ -105,6 +105,8 @@ Native provider links to YouTube videos or WAYO archive episodes are converted i
 
 Native embedded players load inside an HTML wrapper with `https://wayofm.org/` as its base URL and a referrer policy, supplying the client identification YouTube requires. A bare YouTube embed URL without a Referer can fail with player error 153. Mixcloud Live uses its live page inside the native WebView; archive episodes use the dedicated Mixcloud widget.
 
+The **Watch** button opens Mixcloud Live and is distinct from **Live at WAYO**, which opens the station’s show page. Native media navigation allows the live page’s own initial request and canonical URL redirects before converting other provider links. This avoids cancelling the Watch page’s load by routing it back to itself.
+
 All user-provided destinations are centralized in `src/config.ts`. The numeric equivalent of `(585) 203-WAYO` is `(585) 203-9296`. Contact text was verified against the station’s contact page on October 11, 2026. The station-maintained contact page remains accessible inside the app if those details change.
 
 Bundled originals came from:
@@ -117,14 +119,14 @@ The two images match the supplied artwork and were copied without modification. 
 ## Validation
 
 ```sh
-npm run check                 # TypeScript and 20 service/player tests
+npm run check                 # TypeScript and 22 service/player tests
 npm run export                # iOS, Android, and web production bundles
 npm run test:e2e              # web export and 12 mobile-viewport browser tests
 ```
 
 In the cloud, set the cache/Expo variables above before export/e2e commands. Browser tests require Python 3 and Chromium. This machine provides `/usr/bin/chromium`; set `CHROMIUM_PATH` for a different installation. Playwright automatically serves the export during testing. Fixture data/audio are test-only and do not ship in the application.
 
-The current implementation passed the type check, all 20 service/player tests, and all 12 browser tests. The iOS/Android/web bundles exported successfully, and both native projects generated successfully. Player regressions cover hung preparation/resolution, frozen playback clocks, buffering, retry limits, cancellation, system pause/resume, background timer suspension, provider link conversion, and app-launch rejection. Browser tests exercise navigation, archives, actual fixture audio playback, post-start stall recovery, embedded video selection, and the rocket loading view. They verify visible WAYO navigation during playback, Back/Home/tab return paths, preserved archive searches, live-radio handoff, containment of provider popups/top-level navigation, and layouts at 320 × 568 and 390 × 844. The public archive API returned current WAYO episodes. On October 11, 2026, a 20-second station-stream probe returned HTTP 200 and continuous, decodable 192 kbps stereo MP3. This verifies the endpoint at that time, not playback on a phone. The cloud proxy blocks YouTube, so YouTube integration was tested with iframe fixtures rather than actual YouTube playback. Native iPhone/Android behavior, provider playback on devices, and signed binaries remain untested.
+The current implementation passed the type check, all 22 service/player tests, and all 12 browser tests. The iOS/Android/web bundles exported successfully, and both native projects generated successfully. Player regressions cover hung preparation/resolution, frozen playback clocks, buffering, retry limits, cancellation, system pause/resume, background timer suspension, provider link conversion, app-launch rejection, and the native Watch page’s initial load/canonical redirects. Browser tests exercise navigation, archives, actual fixture audio playback, post-start stall recovery, embedded video selection, and the rocket loading view. They verify the Watch label and loaded fixture content, visible WAYO navigation during playback, Back/Home/tab return paths, preserved archive searches, live-radio handoff, containment of provider popups/top-level navigation, and layouts at 320 × 568 and 390 × 844. The public archive API returned current WAYO episodes. On October 11, 2026, a 20-second station-stream probe returned HTTP 200 and continuous, decodable 192 kbps stereo MP3, and the Mixcloud Live page and its trailing-slash redirect returned HTTP 200. These checks verify endpoints at that time, not playback on a phone. The cloud proxy blocks YouTube, so YouTube integration was tested with iframe fixtures rather than actual YouTube playback. Native iPhone/Android behavior, provider playback on devices, and signed binaries remain untested.
 
 ## Cloud environment
 

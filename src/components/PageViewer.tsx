@@ -6,7 +6,7 @@ import { type StationPage } from '../config';
 import { openExternal } from '../services/links';
 import { colors as c } from '../theme';
 import { Button, Icon } from './ui';
-import { EMBED_BASE_URL, canLoadMediaUrl, embeddedPlayerHtml, isEmbeddedPlayerUrl, mediaPageFromUrl } from '../services/embeddedMedia';
+import { EMBED_BASE_URL, decideMediaNavigation, embeddedPlayerHtml, isEmbeddedPlayerUrl, mediaPageFromUrl } from '../services/embeddedMedia';
 import LoadingScreen from './LoadingScreen';
 import VideoPicker from './VideoPicker';
 import MediaFrame from './MediaFrame';
@@ -58,12 +58,16 @@ export default function PageViewer({ page, onClose, onError, inline = false, bac
       }
     }}
     onShouldStartLoadWithRequest={request => {
+      if (inline) {
+        const navigation = decideMediaNavigation(request.url, { ...page, url }, request.isTopFrame);
+        if (navigation.action === 'open') onMediaPage?.(navigation.page);
+        return navigation.action === 'allow';
+      }
       const next = mediaPageFromUrl(request.url);
-      if (next && onMediaPage && (inline || request.isTopFrame) && !isEmbeddedPlayerUrl(request.url)) {
+      if (next && onMediaPage && request.isTopFrame && !isEmbeddedPlayerUrl(request.url)) {
         if (next.url !== url) onMediaPage(next);
         return false;
       }
-      if (inline) return canLoadMediaUrl(request.url, !!page.embed, request.isTopFrame);
       if (request.url === 'about:blank' || request.url.startsWith('https://')) return true;
       if (/^(tel:|sms:|mailto:)/i.test(request.url)) void Linking.openURL(request.url).catch(() => onError('No app is available for that link.'));
       return false;

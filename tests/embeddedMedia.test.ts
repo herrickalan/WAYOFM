@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EMBED_BASE_URL, canLoadMediaUrl, embeddedPlayerHtml, mediaPageFromUrl } from '../src/services/embeddedMedia';
+import { EMBED_BASE_URL, canLoadMediaUrl, decideMediaNavigation, embeddedPlayerHtml, mediaPageFromUrl } from '../src/services/embeddedMedia';
 
 test('untrusted episode titles remain text in the native player document', () => {
   const html = embeddedPlayerHtml('https://www.mixcloud.com/widget/iframe/?feed=%2Fwayoradio%2Fshow%2F&light=1', 'A show "</iframe><script>alert(1)</script>"');
@@ -44,4 +44,33 @@ test('native navigation rejects app-launch schemes and top-level replacements wh
   assert.equal(canLoadMediaUrl('https://www.youtube.com/embed/JWuorF9K-b8?playsinline=1', true, true), true);
   assert.equal(canLoadMediaUrl('https://www.mixcloud.com/widget/iframe/?feed=%2Fwayoradio%2Fshow%2F', true, false), true);
   assert.equal(canLoadMediaUrl('https://www.mixcloud.com/live/wayoradio/', false, true), true);
+});
+
+test('Watch loads its own Mixcloud page and canonical redirects without cancelling navigation', () => {
+  const current = mediaPageFromUrl('https://www.mixcloud.com/live/wayoradio/')!;
+  assert.equal(current.title, 'Watch WAYO');
+  for (const url of [
+    current.url, 'https://www.mixcloud.com/live/wayoradio',
+    'https://www.mixcloud.com/live/wayoradio/?utm_source=app',
+    'https://mixcloud.com/live/wayoradio/',
+  ]) {
+    for (const isTopFrame of [true, false, undefined]) {
+      assert.equal(decideMediaNavigation(url, current, isTopFrame).action, 'allow', url);
+    }
+  }
+  assert.equal(decideMediaNavigation('mixcloud://live/wayoradio/', current, true).action, 'block');
+  assert.equal(decideMediaNavigation('https://www.example.org/', current, true).action, 'block');
+});
+
+test('native routing loads player documents while keeping website links inside WAYO', () => {
+  const current = mediaPageFromUrl('https://www.youtube.com/watch?v=JWuorF9K-b8')!;
+  assert.equal(decideMediaNavigation(EMBED_BASE_URL, current, true).action, 'allow');
+  assert.equal(decideMediaNavigation(current.url, current, false).action, 'allow');
+  assert.equal(decideMediaNavigation(current.browserUrl!, current, true).action, 'block');
+  const next = decideMediaNavigation('https://www.youtube.com/watch?v=6T_sRQx2x94', current, true);
+  assert.equal(next.action, 'open');
+  if (next.action === 'open') assert.match(next.page.url, /\/embed\/6T_sRQx2x94/);
+  const archive = mediaPageFromUrl('https://www.mixcloud.com/wayoradio/morning-show/')!;
+  assert.equal(decideMediaNavigation(archive.url, archive, false).action, 'allow');
+  assert.equal(decideMediaNavigation(archive.browserUrl!, archive, true).action, 'block');
 });

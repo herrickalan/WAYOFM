@@ -189,8 +189,12 @@ test('YouTube and Mixcloud Live open inside the app and video pauses live radio'
   await page.screenshot({ path: testInfo.outputPath('youtube-app.png') });
   await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Play live radio', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Watch live', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Live at WAYO', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Watch live', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Watch', exact: true }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', 'https://www.mixcloud.com/live/wayoradio/');
+  await expect(page.frameLocator('iframe').getByText('Mixcloud Live player fixture')).toBeVisible();
+  await expect(page.getByText('Watch WAYO', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Explore' }).click();
   await expect(page.locator('iframe')).toHaveCount(0);

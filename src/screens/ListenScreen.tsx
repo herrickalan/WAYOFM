@@ -33,7 +33,7 @@ export default function ListenScreen({ radio, openPage, goArchives, external }: 
 
     <View style={s.broadcastLinks}>
       <Button title="Live at WAYO" icon="headphones" kind="light" style={{ flex: 1 }} onPress={() => openPage({ title: 'Live at WAYO', url: LINKS.live })} />
-      <Button title="Watch live" icon="video" kind="blue" style={{ flex: 1 }} onPress={() => openPage({ title: 'Watch WAYO live', url: LINKS.watch })} />
+      <Button title="Watch" icon="video" kind="blue" style={{ flex: 1 }} onPress={() => openPage({ title: 'Watch WAYO', url: LINKS.watch })} />
     </View>
     <Button title="Watch WAYO on YouTube" icon="youtube" kind="light" onPress={() => openPage(YOUTUBE_PAGE)} />
 

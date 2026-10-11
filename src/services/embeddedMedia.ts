@@ -30,7 +30,7 @@ export function mediaPageFromUrl(value: string, title?: string): StationPage | n
     };
   }
   if (!['www.mixcloud.com', 'mixcloud.com'].includes(url.hostname)) return null;
-  if (/^\/live\/wayoradio\/?$/.test(url.pathname)) return { title: title ?? 'Watch WAYO live', url: LINKS.watch, browserUrl: LINKS.watch };
+  if (/^\/live\/wayoradio\/?$/.test(url.pathname)) return { title: title ?? 'Watch WAYO', url: LINKS.watch, browserUrl: LINKS.watch };
   const key = `${url.pathname.replace(/\/$/, '')}/`;
   if (!/^\/wayoradio\/[^/]+\/$/.test(key)) return null;
   return { title: title ?? 'WAYO archive', url: mixcloudEmbed(key), embed: true, browserUrl: `https://www.mixcloud.com${key}` };
@@ -50,6 +50,21 @@ export function canLoadMediaUrl(value: string, embedded: boolean, isTopFrame?: b
   if (url.href === EMBED_BASE_URL) return true;
   return embedded ? isEmbeddedPlayerUrl(value)
     : url.hostname === 'www.mixcloud.com' && /^\/live\/wayoradio\/?$/.test(url.pathname);
+}
+
+export type MediaNavigation = { action: 'allow' | 'block' } | { action: 'open'; page: StationPage };
+
+export function decideMediaNavigation(value: string, current: StationPage, isTopFrame?: boolean): MediaNavigation {
+  const next = mediaPageFromUrl(value);
+  // Watch is a full provider page, not an iframe URL. Its initial request and
+  // canonical redirects must load normally instead of being routed back to itself.
+  if (!current.embed && next?.url === current.url) return { action: 'allow' };
+  if (next && !isEmbeddedPlayerUrl(value)) {
+    // A provider's "watch on website" link for the current episode must keep
+    // its embedded player; links to other playable content open inside WAYO.
+    return next.url === current.url ? { action: 'block' } : { action: 'open', page: next };
+  }
+  return { action: canLoadMediaUrl(value, !!current.embed, isTopFrame) ? 'allow' : 'block' };
 }
 
 function htmlAttribute(value: string): string {
