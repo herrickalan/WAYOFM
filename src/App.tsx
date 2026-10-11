@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,6 +8,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { LINKS, type StationPage } from './config';
 import { colors as c } from './theme';
 import { openExternal } from './services/links';
+import { mediaPageFromUrl } from './services/embeddedMedia';
 import { useLiveRadio } from './hooks/useLiveRadio';
 import { Icon, Wordmark, type IconName } from './components/ui';
 import PageViewer from './components/PageViewer';
@@ -30,6 +31,7 @@ const tabs: { id: Tab; title: string; icon: IconName }[] = [
 function StationApp() {
   const [tab, setTab] = useState<Tab>('listen');
   const [page, setPage] = useState<StationPage | null>(null);
+  const [media, setMedia] = useState<StationPage | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [visitedArchives, setVisitedArchives] = useState(false);
   const scroll = useRef<ScrollView>(null);
@@ -37,15 +39,33 @@ function StationApp() {
   const [fontsLoaded, fontError] = useFonts(Feather.font);
 
   useEffect(() => { if (fontsLoaded || fontError) void SplashScreen.hideAsync(); }, [fontsLoaded, fontError]);
+  useEffect(() => {
+    if (!media) return;
+    const listener = BackHandler.addEventListener('hardwareBackPress', () => { setMedia(null); return true; });
+    return () => listener.remove();
+  }, [media]);
   const external = (url: string) => void openExternal(url).catch(() => setMessage('This link could not be opened. Make sure you have an app available for it.'));
   const openPage = (next: StationPage) => {
-    if (next.embed || [LINKS.live, LINKS.listen, LINKS.watch].includes(next.url)) radio.pause();
-    setPage(next);
+    const playerPage = next.embed ? next : mediaPageFromUrl(next.url, next.title);
+    if (playerPage) {
+      radio.pause();
+      setPage(null);
+      setMedia(playerPage);
+    } else {
+      if ([LINKS.live, LINKS.listen].includes(next.url)) radio.pause();
+      setMedia(null);
+      setPage(next);
+    }
   };
   const changeTab = (next: Tab) => {
+    setMedia(null);
     setTab(next);
     if (next === 'archives') setVisitedArchives(true);
     scroll.current?.scrollTo({ y: 0, animated: false });
+  };
+  const toggleLive = () => {
+    if (media) changeTab('listen');
+    void radio.toggle();
   };
 
   if (!fontsLoaded && !fontError) return <LoadingScreen label="A little different. A lot of WAYO." />;
@@ -57,7 +77,8 @@ function StationApp() {
         <Pressable accessibilityRole="button" accessibilityLabel="WAYO home" onPress={() => changeTab('listen')}><Wordmark /><Text style={s.headerTag}>COMMUNITY POWERED RADIO</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Donate" onPress={() => external(LINKS.donate)} style={s.donate}><Icon name="heart" size={14} /><Text style={s.donateLabel}>Support</Text></Pressable>
       </View>
-      <ScrollView ref={scroll} style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      {media && <PageViewer key={media.url} page={media} inline backLabel={tabs.find(item => item.id === tab)!.title} onClose={() => setMedia(null)} onHome={() => changeTab('listen')} onMediaPage={openPage} onError={setMessage} />}
+      <ScrollView ref={scroll} style={[s.scroll, media && { display: 'none' }]} contentContainerStyle={s.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {tab === 'listen' && <ListenScreen radio={radio} openPage={openPage} goArchives={() => changeTab('archives')} external={external} />}
         {tab === 'explore' && <ExploreScreen openPage={openPage} />}
         {visitedArchives && <View style={{ display: tab === 'archives' ? 'flex' : 'none' }}><ArchivesScreen openPage={openPage} /></View>}
@@ -69,13 +90,13 @@ function StationApp() {
         <View style={s.miniArt}><Icon name="radio" size={20} color={c.white} /></View>
         <View style={{ flex: 1, gap: 3 }}><Text style={s.miniTitle}>WAYO 104.3FM</Text><Text style={s.miniLabel} accessibilityLiveRegion="polite">{radio.label}</Text></View>
         <View style={s.liveBadge}><View style={[s.dot, { backgroundColor: radio.playing ? c.green : c.orange }]} /><Text style={s.liveBadgeText}>LIVE</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel={radio.busy ? 'Cancel live playback' : radio.playing ? 'Pause broadcast' : 'Listen to broadcast'} style={s.miniPlay} onPress={() => void radio.toggle()}><Icon name={radio.busy ? 'x' : radio.playing ? 'pause' : 'play'} size={20} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={radio.busy ? 'Cancel live playback' : radio.playing ? 'Pause broadcast' : 'Listen to broadcast'} style={s.miniPlay} onPress={toggleLive}><Icon name={radio.busy ? 'x' : radio.playing ? 'pause' : 'play'} size={20} /></Pressable>
       </View>
-      <View accessibilityRole="tablist" style={s.tabs}>{tabs.map(item => <Pressable key={item.id} accessibilityRole="tab" accessibilityLabel={item.title} accessibilityState={{ selected: tab === item.id }} onPress={() => changeTab(item.id)} style={s.tab}>
+      <View accessibilityRole="tablist" style={s.tabs}>{tabs.map(item => <Pressable key={item.id} accessibilityRole="tab" accessibilityLabel={item.title} accessibilityState={{ selected: tab === item.id }} aria-selected={tab === item.id} onPress={() => changeTab(item.id)} style={s.tab}>
         <View style={[s.tabIcon, tab === item.id && { backgroundColor: c.paleBlue }]}><Icon name={item.icon} color={tab === item.id ? c.blue : c.muted} size={20} /></View><Text style={[s.tabLabel, tab === item.id && { color: c.blue }]}>{item.title}</Text>
       </Pressable>)}</View>
     </SafeAreaView>
-    <PageViewer page={page} onClose={() => setPage(null)} onError={setMessage} />
+    <PageViewer page={page} onClose={() => setPage(null)} onMediaPage={openPage} onError={setMessage} />
   </View>;
 }
 

@@ -11,7 +11,7 @@ The repository tree keeps generated `ios/` and `android/` directories out of ver
 ## Included
 
 - **Listen:** native live audio, persistent player, pause/resume at the live edge, startup and playback-stall detection, up to two automatic reconnects, connection cancellation, manual retry and website fallback. Background audio and lock-screen controls are configured for native development/production builds.
-- **Watch:** Mixcloud Live stays inside the app. YouTube opens an embedded player with three station-featured Live at WAYO performances and a video picker, available from Listen and Community. Opening a media player pauses live radio; closing it stops the embedded player.
+- **Watch:** Mixcloud Live, archived episodes, and YouTube players stay within WAYO’s main layout, with its header, live controls, and all four tabs visible. Labeled **Back** and **Home** buttons return to the previous screen or Listen. YouTube includes three station-featured Live at WAYO performances and a video picker, available from Listen and Community. Opening media pauses live radio; leaving its screen stops the embedded player.
 - **Explore:** Live at WAYO, Show Guide, daily Schedule, About, News, and Supporters. These station-maintained pages open inside the native app using WebView, keeping content current.
 - **Archives:** live Mixcloud API data, episode artwork, dates and durations, search across loaded episodes, pagination, and Mixcloud’s embedded episode player. Live radio pauses before watching video or playing an archive. No sample episodes are shipped in the app.
 - **Community:** browser-based donation, volunteering, DJ application, and subscription; call, SMS, email, social accounts, map directions, and full studio/mailing/inquiry information.
@@ -97,7 +97,11 @@ Each live connection has a 15-second startup limit, including audio-session prep
 
 The archive reads `https://api.mixcloud.com/wayoradio/cloudcasts/?limit=20` and follows validated pagination URLs. The complete station archive remains accessible at `https://wayofm.org/episodes`. Live audio and archived Mixcloud playback use separate services; archived audio is played by Mixcloud’s official widget rather than downloading protected media.
 
-YouTube uses its official iframe player for The Thriffs, Rayanna and the Feral Dogs, and East Esker, verified against `https://wayofm.org/shows/live-wayo` on October 11, 2026. This is a curated selection rather than an automatic list of all channel uploads. Add or replace entries in `YOUTUBE_VIDEOS` in `src/config.ts`. The YouTube toolbar’s optional browser button still opens the requested WAYO channel. Playback starts when the user taps the provider’s play control; fullscreen and inline playback are enabled. Provider login or embedding restrictions can still apply.
+YouTube uses its official iframe player for The Thriffs, Rayanna and the Feral Dogs, and East Esker, verified against `https://wayofm.org/shows/live-wayo` on October 11, 2026. This is a curated selection rather than an automatic list of all channel uploads. Add or replace entries in `YOUTUBE_VIDEOS` in `src/config.ts`. Playback starts when the user taps the provider’s play control. Playback normally stays inline; choosing the provider’s fullscreen control opens its fullscreen view, which can be dismissed with Done/Back. Provider login or embedding restrictions can still apply.
+
+Media uses the app’s content area, keeping WAYO navigation visible during playback. Back returns to the originating tab and preserves loaded archive episodes and search text. Home and the WAYO logo return to Listen; any tab closes the player and opens that tab. Android’s system Back also closes the player. Starting live radio from the station controls first closes embedded media to prevent overlapping audio. Station information pages continue to use their separate page viewer.
+
+Native provider links to YouTube videos or WAYO archive episodes are converted into embedded players. Provider app-launch schemes and automatic external-window requests are blocked rather than opening another app. Iframe sandbox rules also prevent embedded pages from replacing the app or opening popup windows. The native player error screen offers an explicit Open in browser fallback; a failed featured YouTube player’s fallback opens the WAYO channel.
 
 Native embedded players load inside an HTML wrapper with `https://wayofm.org/` as its base URL and a referrer policy, supplying the client identification YouTube requires. A bare YouTube embed URL without a Referer can fail with player error 153. Mixcloud Live uses its live page inside the native WebView; archive episodes use the dedicated Mixcloud widget.
 
@@ -113,14 +117,14 @@ The two images match the supplied artwork and were copied without modification. 
 ## Validation
 
 ```sh
-npm run check                 # TypeScript and 17 service/player tests
+npm run check                 # TypeScript and 20 service/player tests
 npm run export                # iOS, Android, and web production bundles
-npm run test:e2e              # web export and 9 mobile-viewport browser tests
+npm run test:e2e              # web export and 12 mobile-viewport browser tests
 ```
 
 In the cloud, set the cache/Expo variables above before export/e2e commands. Browser tests require Python 3 and Chromium. This machine provides `/usr/bin/chromium`; set `CHROMIUM_PATH` for a different installation. Playwright automatically serves the export during testing. Fixture data/audio are test-only and do not ship in the application.
 
-The current implementation passed the type check, all 17 service/player tests, and all nine browser tests. The iOS/Android/web bundles exported successfully, and both native projects generated successfully. Player regressions cover hung preparation/resolution, frozen playback clocks, buffering, retry limits, cancellation, system pause/resume, and background timer suspension. Browser tests exercise navigation, archives, actual fixture audio playback, post-start stall recovery, embedded video selection, and the rocket loading view. The public archive API returned current WAYO episodes. On October 11, 2026, a 20-second station-stream probe returned HTTP 200 and continuous, decodable 192 kbps stereo MP3. This verifies the endpoint at that time, not playback on a phone. The cloud proxy blocks YouTube, so YouTube integration was tested with iframe fixtures rather than actual YouTube playback. Native iPhone/Android behavior, provider playback on devices, and signed binaries remain untested.
+The current implementation passed the type check, all 20 service/player tests, and all 12 browser tests. The iOS/Android/web bundles exported successfully, and both native projects generated successfully. Player regressions cover hung preparation/resolution, frozen playback clocks, buffering, retry limits, cancellation, system pause/resume, background timer suspension, provider link conversion, and app-launch rejection. Browser tests exercise navigation, archives, actual fixture audio playback, post-start stall recovery, embedded video selection, and the rocket loading view. They verify visible WAYO navigation during playback, Back/Home/tab return paths, preserved archive searches, live-radio handoff, containment of provider popups/top-level navigation, and layouts at 320 × 568 and 390 × 844. The public archive API returned current WAYO episodes. On October 11, 2026, a 20-second station-stream probe returned HTTP 200 and continuous, decodable 192 kbps stereo MP3. This verifies the endpoint at that time, not playback on a phone. The cloud proxy blocks YouTube, so YouTube integration was tested with iframe fixtures rather than actual YouTube playback. Native iPhone/Android behavior, provider playback on devices, and signed binaries remain untested.
 
 ## Cloud environment
 

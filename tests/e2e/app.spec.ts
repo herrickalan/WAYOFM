@@ -50,6 +50,18 @@ test('archives search, pagination, state preservation, and Mixcloud player', asy
   await expect(page.getByRole('textbox')).toHaveValue('evening');
   await page.getByRole('button', { name: 'Play Evening Show' }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', /feed=%2Fwayoradio%2Fevening%2F/);
+  await expect(page.getByRole('button', { name: 'WAYO home' })).toBeVisible();
+  for (const name of ['Listen', 'Explore', 'Archives', 'Community']) await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to Archives' }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByRole('textbox')).toHaveValue('evening');
+  await expect(page.getByRole('button', { name: 'Play Evening Show' })).toBeVisible();
+  await page.getByRole('button', { name: 'Play Evening Show' }).click();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  await expect(page.getByText('A little different.')).toBeVisible();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Archives' }).click();
+  await expect(page.getByRole('textbox')).toHaveValue('evening');
 });
 
 test('archive failures provide retry and a website fallback', async ({ page }) => {
@@ -84,8 +96,13 @@ test('audio loads and plays, persists across tabs, and pauses before archive pla
   await expect(page.getByRole('button', { name: 'Pause broadcast' })).toBeVisible();
   await page.getByRole('tab', { name: 'Archives' }).click();
   await page.getByRole('button', { name: 'Play Morning Show' }).click();
-  await page.getByRole('button', { name: 'Close page' }).click();
+  await page.getByRole('button', { name: 'Back to Archives' }).click();
   await expect(page.getByRole('button', { name: 'Listen to broadcast' })).toBeVisible();
+  await page.getByRole('button', { name: 'Play Morning Show' }).click();
+  await page.getByRole('button', { name: 'Listen to broadcast' }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Listen', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('button', { name: 'Pause live radio' })).toBeVisible();
 });
 
 test('unavailable audio stream shows a useful fallback', async ({ page }) => {
@@ -164,18 +181,68 @@ test('YouTube and Mixcloud Live open inside the app and video pauses live radio'
   await expect(page.locator('iframe')).toHaveAttribute('src', 'https://www.youtube.com/embed/JWuorF9K-b8?playsinline=1&rel=0');
   await expect(page.locator('iframe')).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
   await expect(page.locator('iframe')).toHaveAttribute('allow', /fullscreen/);
+  await expect(page.getByRole('button', { name: 'WAYO home' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to Listen' })).toBeVisible();
+  for (const name of ['Listen', 'Explore', 'Archives', 'Community']) await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Play Rayanna and the Feral Dogs · Live at WAYO' }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', /embed\/6T_sRQx2x94/);
   await page.screenshot({ path: testInfo.outputPath('youtube-app.png') });
-  await page.getByRole('button', { name: 'Close page' }).click();
+  await page.getByRole('button', { name: 'Home', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Play live radio', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Watch live', exact: true }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', 'https://www.mixcloud.com/live/wayoradio/');
-  await page.getByRole('button', { name: 'Close page' }).click();
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Explore' }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
   await page.getByRole('tab', { name: 'Community' }).click();
   await page.getByRole('button', { name: 'YouTube', exact: true }).click();
   await expect(page.locator('iframe')).toHaveAttribute('src', /embed\/JWuorF9K-b8/);
+  await expect(page.getByRole('button', { name: 'Back to Community' })).toBeVisible();
+  await page.getByRole('button', { name: 'WAYO home' }).click();
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await expect(page.getByText('A little different.')).toBeVisible();
   expect(context.pages()).toHaveLength(1);
+});
+
+for (const provider of ['YouTube', 'Mixcloud'] as const) {
+  test(`${provider} player links cannot replace WAYO or launch a new browser window`, async ({ page, context }) => {
+    await archives(page);
+    const host = provider === 'YouTube' ? 'https://www.youtube.com/**' : 'https://www.mixcloud.com/**';
+    await page.route(host, route => route.fulfill({ contentType: 'text/html', body: `<html><body>
+      <a href="https://www.youtube.com/watch?v=JWuorF9K-b8" target="_blank">Provider website</a>
+      <a href="https://www.youtube.com/watch?v=JWuorF9K-b8" target="_top">Replace app</a>
+    </body></html>` }));
+    await page.goto('/');
+    if (provider === 'YouTube') await page.getByRole('button', { name: 'Watch WAYO on YouTube' }).click();
+    else {
+      await page.getByRole('tab', { name: 'Archives' }).click();
+      await page.getByRole('button', { name: 'Play Morning Show' }).click();
+    }
+    const player = page.frameLocator('iframe');
+    await player.getByRole('link', { name: 'Provider website' }).click();
+    await player.getByRole('link', { name: 'Replace app' }).click();
+    await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Listen', exact: true })).toBeVisible();
+    expect(context.pages()).toHaveLength(1);
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await expect(page.getByText('A little different.')).toBeVisible();
+  });
+}
+
+test('player return controls and WAYO tabs remain visible on short, narrow phones', async ({ page }, testInfo) => {
+  await page.route('https://www.youtube.com/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body>YouTube player fixture</body></html>' }));
+  for (const viewport of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Watch WAYO on YouTube' }).click();
+    await expect(page.getByRole('button', { name: 'Back to Listen' })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeInViewport();
+    for (const name of ['Listen', 'Explore', 'Archives', 'Community']) await expect(page.getByRole('tab', { name, exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    await page.screenshot({ path: testInfo.outputPath(`media-navigation-${viewport.width}.png`) });
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await expect(page.locator('iframe')).toHaveCount(0);
+  }
 });
 
 test('the supplied rocket is visible on the app loading screen', async ({ page }) => {
