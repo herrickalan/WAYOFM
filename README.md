@@ -4,7 +4,7 @@ A native iPhone and Android radio app built with **Expo SDK 57**, React Native 0
 
 ## Download from GitHub
 
-Use **Code → Download ZIP** to download this repository, or download [the complete app source ZIP](downloads/WAYO-SDK57-source.zip) and choose **Download raw file** on its GitHub file page. The app source ZIP includes the generated Swift iOS and Kotlin Android projects as well as the shared app source, assets, and build instructions. It contains source code, not an installable APK or IPA.
+Use **Code → Download ZIP** to download this repository, or download [the complete app source ZIP](https://github.com/herrickalan/WAYOFM/raw/refs/heads/main/downloads/WAYO-SDK57-source.zip). The app source ZIP includes the generated Swift iOS and Kotlin Android projects as well as the shared app source, assets, and build instructions. It contains source code, not an installable APK or IPA.
 
 The repository tree keeps generated `ios/` and `android/` directories out of version control; regenerate them with `npm run prebuild -- --no-install`, or use the included source ZIP.
 
@@ -20,13 +20,32 @@ The repository tree keeps generated `ios/` and `android/` directories out of ver
 
 Use Node.js 22.13+ (Node 24 was used here) and npm.
 
+Install **Expo Go** on your phone and open a terminal in the downloaded app folder containing `package.json`:
+
 ```sh
-cd /workspace/WAYOFM
 npm ci
 npm start
 ```
 
-Use an SDK 57 compatible Expo Go installation for a quick foreground smoke test. Use a native development build for background audio, Android media notifications, and lock-screen controls. Expo Go’s native settings do not substitute for testing the app’s own native binary.
+`npm start` explicitly selects Expo Go. The terminal should say **Using Expo Go** and show an `exp://` URL below the QR code. Keep the terminal running and connect your computer and phone to the same Wi-Fi. On iPhone, scan with the Camera app and tap the Open in Expo Go banner. On Android, scan with Expo Go’s QR scanner.
+
+If you invoke Expo directly, use **`npx`**, including the Go flag:
+
+```sh
+npx expo start --go
+```
+
+Because this project also includes `expo-dev-client`, plain `npx expo start` can default to a custom development build. Its `exp+wayo-radio://` QR code cannot launch until that custom WAYO build has been installed on your phone. Press **s** in the Expo terminal to switch between Expo Go and the development build, or stop it with **Ctrl+C** and restart with `--go`.
+
+If the QR code opens but the phone cannot reach Metro, check Wi-Fi, VPN, and your computer’s firewall. For a remote/cloud computer or an inaccessible local network, use a tunnel from your own terminal:
+
+```sh
+npx expo start --go --tunnel
+```
+
+Expo may ask to install its ngrok tunnel helper; follow the CLI prompt. Tunnel startup needs Internet access and must print a reachable URL before scanning. Expo’s offline CLI mode cannot be used with `--tunnel`; unset `EXPO_OFFLINE` if you previously set it. Cloud network policy can also block tunnel destinations, so use a local computer when cloud tunneling is unavailable.
+
+Use an SDK 57 compatible Expo Go installation for a quick foreground smoke test. If Expo Go reports an SDK mismatch, update it. Use an installed native development build for background audio, Android media notifications, and lock-screen controls: `npm run start:dev`. Expo Go’s native settings do not substitute for testing the app’s own native binary.
 
 For this cloud machine, caches and Expo’s optional online CLI checks need these settings:
 
